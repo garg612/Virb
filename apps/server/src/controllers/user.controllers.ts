@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { Apierror } from "../utils/Apierror.js";
 import { Apiresponse } from "../utils/Apiresponse.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import { publishMediaUpload } from "../rabbitmq/index.js";
 import userValidate from "../validation/user.validation.js";
 import { asyncHandler } from "../utils/asynchandler.js";
 
@@ -193,7 +194,20 @@ const changeAvatar = asyncHandler(async (req, res) => {
     });
   }
 
-  // upload to cloudinary
+  const queued = publishMediaUpload({
+    type: "USER_AVATAR",
+    targetId: userId,
+    filePath: avatarLocalPath,
+  });
+
+  if (queued) {
+    return res.status(202).json({
+      message: "Avatar upload queued for background processing",
+      status: "queued",
+    });
+  }
+
+  // upload to cloudinary fallback
   const uploadedAvatar = await uploadOnCloudinary(avatarLocalPath);
 
   if (!uploadedAvatar) {

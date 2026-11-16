@@ -73,3 +73,42 @@ export interface AuthState {
   user: User | null;
   token: string | null;
 }
+
+export interface Product {
+  id: number;
+  title: string;
+  description: string;
+  price: number;
+  currency: string;
+  category: string;
+  images: string[];
+  status: "ACTIVE" | "SOLD" | "ARCHIVED";
+  sellerId: number;
+  seller: {
+    id: number;
+    name: string;
+    username: string;
+    email?: string;
+    avatar?: string | null;
+  };
+  orders?: Order[];
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface Order {
+  id: number;
+  productId: number;
+  product?: Product;
+  buyerId: number;
+  buyer?: User;
+  sellerId: number;
+  seller?: User;
+  amount: number;
+  currency: string;
+  status: string;
+  paymentMethod: string;
+  transactionId: string;
+  createdAt: string;
+}
+

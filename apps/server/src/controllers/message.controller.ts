@@ -1,6 +1,6 @@
 import prisma from "../db/prisma.js";
 import { asyncHandler } from "../utils/asynchandler.js";
-import { io } from "../socket/socket.js";
+import { publishChatEvent } from "../rabbitmq/index.js";
 
 const deletemessage = asyncHandler(async (req, res) => {
   const userId = req.user.id;
@@ -35,7 +35,7 @@ const deletemessage = asyncHandler(async (req, res) => {
     },
   });
 
-  io?.to(message.conversationId.toString()).emit("message deleted", {
+  await publishChatEvent("message deleted", message.conversationId.toString(), {
     messageId: deleted.id,
   });
 
@@ -95,7 +95,7 @@ const editmessage = asyncHandler(async (req, res) => {
     },
   });
 
-  io?.to(message.conversationId.toString()).emit("message edited", {
+  await publishChatEvent("message edited", message.conversationId.toString(), {
     message: updatemessage,
   });
 

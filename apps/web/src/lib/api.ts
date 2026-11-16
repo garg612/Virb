@@ -1,4 +1,4 @@
-import { User, Conversation, Message, Call } from "./types";
+import { User, Conversation, Message, Call, Product, Order } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
@@ -259,5 +259,98 @@ export const api = {
       throw new Error(json.message || "Failed to load call history");
     }
     return json.calls || [];
+  },
+
+  // Marketplace & Sell Requirements
+  async createRequirement(data: {
+    title: string;
+    description: string;
+    price: number;
+    currency?: string;
+    category?: string;
+    image?: string;
+  }): Promise<Product> {
+    const res = await fetch(`${API_BASE}/api/marketplace/requirements`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.message || "Failed to create requirement");
+    }
+    return json.product;
+  },
+
+  async getMyRequirements(): Promise<Product[]> {
+    const res = await fetch(`${API_BASE}/api/marketplace/my-requirements`, {
+      headers: getHeaders(),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.message || "Failed to load requirements");
+    }
+    return json.products || [];
+  },
+
+  async deleteRequirement(id: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/marketplace/requirements/${id}`, {
+      method: "DELETE",
+      headers: getHeaders(),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.message || "Failed to delete requirement");
+    }
+  },
+
+  async searchMarketplace(query: string): Promise<Product[]> {
+    if (!query || !query.trim()) return [];
+    const res = await fetch(
+      `${API_BASE}/api/marketplace/search?q=${encodeURIComponent(query.trim())}`,
+      {
+        headers: getHeaders(),
+      }
+    );
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.message || "Failed to search requirements");
+    }
+    return json.products || [];
+  },
+
+  async startChatWithSeller(productId: number): Promise<{ conversation: Conversation; product: Product }> {
+    const res = await fetch(`${API_BASE}/api/marketplace/start-chat`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({ productId }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.message || "Failed to start chat with seller");
+    }
+    return {
+      conversation: json.conversation,
+      product: json.product,
+    };
+  },
+
+  async payForRequirement(
+    productId: number,
+    paymentMethod: string = "CARD"
+  ): Promise<{ order: Order; conversationId: number }> {
+    const res = await fetch(`${API_BASE}/api/marketplace/pay`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({ productId, paymentMethod }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.message || "Payment failed");
+    }
+    return {
+      order: json.order,
+      conversationId: json.conversationId,
+    };
   },
 };

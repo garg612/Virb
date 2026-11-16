@@ -10,6 +10,7 @@ import userRoutes from "./routes/user.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import conversationRoutes from "./routes/conversation.routes.js";
 import callRoutes from "./routes/call.routes.js";
+import marketplaceRoutes from "./routes/marketplace.routes.js";
 
 const app = express();
 app.use(helmet());
@@ -32,5 +33,6 @@ app.use("/api/users", userRoutes);
 app.use("/api/conversations", conversationRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/calls", callRoutes);
+app.use("/api/marketplace", marketplaceRoutes);
 
 export { app };

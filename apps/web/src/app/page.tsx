@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { User, Conversation, Message } from "../lib/types";
+import { User, Conversation, Message, Product, Order } from "../lib/types";
 import { api } from "../lib/api";
 import { useSocket } from "../hooks/useSocket";
 import { useWebRTC } from "../hooks/useWebRTC";
@@ -12,6 +12,9 @@ import { AuthModal } from "../components/AuthModal";
 import { CallModal } from "../components/CallModal";
 import { UserSearchModal } from "../components/UserSearchModal";
 import { GroupModal } from "../components/GroupModal";
+import { RequirementModal } from "../components/RequirementModal";
+import { MarketSearchModal } from "../components/MarketSearchModal";
+import { PaymentModal } from "../components/PaymentModal";
 
 export default function HomePage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -29,6 +32,15 @@ export default function HomePage() {
   // Modals
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isRequirementOpen, setIsRequirementOpen] = useState(false);
+  const [isMarketSearchOpen, setIsMarketSearchOpen] = useState(false);
+  const [paymentModalState, setPaymentModalState] = useState<{
+    isOpen: boolean;
+    product: Product | null;
+  }>({
+    isOpen: false,
+    product: null,
+  });
   const [groupModalState, setGroupModalState] = useState<{ isOpen: boolean; mode: "create" | "settings" }>({
     isOpen: false,
     mode: "create",
@@ -297,6 +309,39 @@ export default function HomePage() {
     }
   };
 
+  // Action: Start chat with seller for a specific product
+  const handleStartChatWithSeller = async (product: Product) => {
+    try {
+      const res = await api.startChatWithSeller(product.id);
+      await loadConversations();
+      setActiveConversation(res.conversation);
+      const msgs = await api.getMessages(res.conversation.id);
+      setMessages(msgs);
+    } catch (err: any) {
+      alert(err.message || "Failed to start chat with seller");
+    }
+  };
+
+  const handleOpenPayment = (product: Product) => {
+    setPaymentModalState({
+      isOpen: true,
+      product,
+    });
+  };
+
+  const handlePaymentSuccess = async (order: Order, conversationId: number) => {
+    setPaymentModalState({ isOpen: false, product: null });
+    await loadConversations();
+    const convs = await api.getMyConversations();
+    setConversations(convs);
+    const target = convs.find((c: Conversation) => c.id === conversationId);
+    if (target) {
+      setActiveConversation(target);
+    }
+    const msgs = await api.getMessages(conversationId);
+    setMessages(msgs);
+  };
+
   const handleLogout = async () => {
     await api.logout();
     setCurrentUser(null);
@@ -349,6 +394,8 @@ export default function HomePage() {
         isConnected={isConnected}
         onOpenNewChat={() => setIsSearchOpen(true)}
         onOpenNewGroup={() => setGroupModalState({ isOpen: true, mode: "create" })}
+        onOpenMarketSearch={() => setIsMarketSearchOpen(true)}
+        onOpenRequirements={() => setIsRequirementOpen(true)}
         onLogout={handleLogout}
         onOpenAuth={() => setIsAuthOpen(true)}
       />
@@ -435,6 +482,30 @@ export default function HomePage() {
           onEnd={endCall}
         />
       )}
+      {/* Requirements Modal (Sell items, hidden by default) */}
+      <RequirementModal
+        isOpen={isRequirementOpen}
+        onClose={() => setIsRequirementOpen(false)}
+        currentUser={currentUser}
+      />
+
+      {/* Marketplace Search Modal (Search keyword to discover sellers and items) */}
+      <MarketSearchModal
+        isOpen={isMarketSearchOpen}
+        onClose={() => setIsMarketSearchOpen(false)}
+        currentUser={currentUser}
+        onStartChatWithSeller={handleStartChatWithSeller}
+        onOpenPayment={handleOpenPayment}
+      />
+
+      {/* Payment & Checkout Modal */}
+      <PaymentModal
+        isOpen={paymentModalState.isOpen}
+        product={paymentModalState.product}
+        currentUser={currentUser}
+        onClose={() => setPaymentModalState({ isOpen: false, product: null })}
+        onPaymentSuccess={handlePaymentSuccess}
+      />
     </div>
   );
 }
