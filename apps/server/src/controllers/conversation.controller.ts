@@ -2,7 +2,6 @@ import prisma from "../db/prisma.js";
 import messageValidate from "../validation/message.validation.js";
 import { asyncHandler } from "../utils/asynchandler.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
-import { publishChatEvent, publishMediaUpload } from "../rabbitmq/index.js";
 
 const createconversation = asyncHandler(async (req, res) => {
   const senderId = req.user.id;
@@ -70,8 +69,11 @@ const createconversation = asyncHandler(async (req, res) => {
     },
   });
 
-  await publishChatEvent("conversationUpdated", receiverId.toString(), conversation);
-  await publishChatEvent("conversationUpdated", senderId.toString(), conversation);
+  const socketModule = await import("../socket/socket.js");
+  if (socketModule.io) {
+    socketModule.io.to(receiverId.toString()).emit("conversationUpdated", conversation);
+    socketModule.io.to(senderId.toString()).emit("conversationUpdated", conversation);
+  }
 
   return res.status(201).json({
     message: "Conversation created successfully",
@@ -127,11 +129,12 @@ const createGroup = asyncHandler(async (req, res) => {
     },
   });
 
-  await Promise.all(
-    allMemberIds.map((mId) =>
-      publishChatEvent("conversationUpdated", mId.toString(), group)
-    )
-  );
+  const socketModule = await import("../socket/socket.js");
+  if (socketModule.io) {
+    allMemberIds.forEach((mId) => {
+      socketModule.io.to(mId.toString()).emit("conversationUpdated", group);
+    });
+  }
 
   return res.status(201).json({
     message: "Group created successfully",
@@ -167,16 +170,6 @@ const sendMessage = asyncHandler(async (req, res) => {
   const conversation = await prisma.conversation.findUnique({
     where: {
       id: Number(conversationId),
-    },
-    include: {
-      participants: {
-        select: {
-          id: true,
-          name: true,
-          username: true,
-          avatar: true,
-        },
-      },
     },
   });
 
@@ -235,21 +228,9 @@ const sendMessage = asyncHandler(async (req, res) => {
       },
     },
   });
-  await publishChatEvent("newMessage", conversationId.toString(), message);
-
-  // Broadcast conversationUpdated to all participants' individual rooms
-  if (conversation && conversation.participants) {
-    const updatedConversationPayload = {
-      ...conversation,
-      messages: [message],
-      updatedAt: new Date().toISOString(),
-    };
-    await Promise.all(
-      conversation.participants.map((p) =>
-        publishChatEvent("conversationUpdated", p.id.toString(), updatedConversationPayload)
-      )
-    );
-  }
+  // import io dynamically to avoid circular import problems
+  const socketModule = await import("../socket/socket.js");
+  socketModule.io?.to(conversationId.toString()).emit("newMessage", message);
 
   return res.status(201).json({
     message: "Message sent successfully",
@@ -378,8 +359,11 @@ const addGroupmember = asyncHandler(async (req, res) => {
     },
   });
 
-  await publishChatEvent("conversationUpdated", newMemberId.toString(), updatedgroup);
-  await publishChatEvent("conversationUpdated", conversationId.toString(), updatedgroup);
+  const socketModule = await import("../socket/socket.js");
+  if (socketModule.io) {
+    socketModule.io.to(newMemberId.toString()).emit("conversationUpdated", updatedgroup);
+    socketModule.io.to(conversationId.toString()).emit("conversationUpdated", updatedgroup);
+  }
 
   return res.status(200).json({
     message: "Member added successfully",
@@ -432,10 +416,13 @@ const removeGroupmember = asyncHandler(async (req, res) => {
     },
   });
 
-  await publishChatEvent("conversationRemoved", memberId.toString(), {
-    conversationId: Number(conversationId),
-  });
-  await publishChatEvent("conversationUpdated", conversationId.toString(), updatedgroup);
+  const socketModule = await import("../socket/socket.js");
+  if (socketModule.io) {
+    socketModule.io.to(memberId.toString()).emit("conversationRemoved", {
+      conversationId: Number(conversationId),
+    });
+    socketModule.io.to(conversationId.toString()).emit("conversationUpdated", updatedgroup);
+  }
 
   return res.status(200).json({
     message: "Member removed successfully",
@@ -564,21 +551,6 @@ const changeAvatar = asyncHandler(async (req, res) => {
     });
   }
 
-  const queued = publishMediaUpload({
-    type: "GROUP_AVATAR",
-    targetId: Number(conversationId),
-    filePath: filelocalpath,
-    userId,
-  });
-
-  if (queued) {
-    return res.status(202).json({
-      message: "Group avatar upload queued for background processing",
-      status: "queued",
-    });
-  }
-
-  // Fallback to synchronous upload if RabbitMQ is offline
   const uploadimage = await uploadOnCloudinary(filelocalpath);
 
   if (!uploadimage) {
@@ -595,8 +567,6 @@ const changeAvatar = asyncHandler(async (req, res) => {
       groupAvatar: uploadimage.url,
     },
   });
-
-  await publishChatEvent("conversationUpdated", conversationId.toString(), updatedGroup);
 
   return res.status(200).json({
     message: "Group avatar updated",
@@ -665,8 +635,11 @@ const acceptConversationRequest = asyncHandler(async (req, res) => {
     },
   });
 
-  await publishChatEvent("conversationUpdated", userId.toString(), updated);
-  await publishChatEvent("conversationUpdated", conversationId.toString(), updated);
+  const socketModule = await import("../socket/socket.js");
+  if (socketModule.io) {
+    socketModule.io.to(userId.toString()).emit("conversationUpdated", updated);
+    socketModule.io.to(conversationId.toString()).emit("conversationUpdated", updated);
+  }
 
   return res.status(200).json({
     message: "Request accepted successfully",
@@ -702,6 +675,8 @@ const rejectConversationRequest = asyncHandler(async (req, res) => {
     });
   }
 
+  const socketModule = await import("../socket/socket.js");
+
   if (conversation.isGroup) {
     // If it's a group: disconnect the user from participants and remove from acceptedUserIds
     const updated = await prisma.conversation.update({
@@ -724,10 +699,12 @@ const rejectConversationRequest = asyncHandler(async (req, res) => {
       },
     });
 
-    await publishChatEvent("conversationRemoved", userId.toString(), {
-      conversationId: Number(conversationId),
-    });
-    await publishChatEvent("conversationUpdated", conversationId.toString(), updated);
+    if (socketModule.io) {
+      socketModule.io.to(userId.toString()).emit("conversationRemoved", {
+        conversationId: Number(conversationId),
+      });
+      socketModule.io.to(conversationId.toString()).emit("conversationUpdated", updated);
+    }
 
     return res.status(200).json({
       message: "Group invitation rejected and removed from group",
@@ -739,13 +716,13 @@ const rejectConversationRequest = asyncHandler(async (req, res) => {
       where: { id: Number(conversationId) },
     });
 
-    await Promise.all(
-      conversation.participants.map((p) =>
-        publishChatEvent("conversationRemoved", p.id.toString(), {
+    if (socketModule.io) {
+      conversation.participants.forEach((p) => {
+        socketModule.io.to(p.id.toString()).emit("conversationRemoved", {
           conversationId: Number(conversationId),
-        })
-      )
-    );
+        });
+      });
+    }
 
     return res.status(200).json({
       message: "Conversation request rejected and deleted",

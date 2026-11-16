@@ -2,7 +2,6 @@ import { Server } from "socket.io";
 import { Server as HttpServer } from "http";
 import prisma from "../db/prisma.js";
 import { markCallMissedIfStillRinging } from "../utils/call-status.js";
-import { publishDelayedCallTimeout } from "../rabbitmq/index.js";
 
 let io: Server | undefined;
 
@@ -104,16 +103,14 @@ const initSocketServer = (server: HttpServer): void => {
         });
       }
 
-      const callerId = callerInfo?.id ?? callerInfo?.Id;
-      const scheduledWithRabbitMQ = publishDelayedCallTimeout(callId, callerId, 30000);
-
-      if (!scheduledWithRabbitMQ) {
-        setTimeout(() => {
-          markCallMissedIfStillRinging(callId, callerId).catch((error) => {
-            console.error("Failed to auto-mark missed socket call", error);
-          });
-        }, 30000);
-      }
+      setTimeout(() => {
+        markCallMissedIfStillRinging(
+          callId,
+          callerInfo?.id ?? callerInfo?.Id
+        ).catch((error) => {
+          console.error("Failed to auto-mark missed socket call", error);
+        });
+      }, 30000);
     });
 
     socket.on("acceptcall", async (data) => {
