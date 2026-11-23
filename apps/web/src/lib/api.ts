@@ -261,6 +261,7 @@ export const api = {
     return json.calls || [];
   },
 
+  // Marketplace & Sell Requirements
   async createRequirement(data: {
     title: string;
     description: string;
@@ -304,10 +305,12 @@ export const api = {
   },
 
   async searchMarketplace(query: string): Promise<Product[]> {
-    if (!query.trim()) return [];
+    if (!query || !query.trim()) return [];
     const res = await fetch(
       `${API_BASE}/api/marketplace/search?q=${encodeURIComponent(query.trim())}`,
-      { headers: getHeaders() }
+      {
+        headers: getHeaders(),
+      }
     );
     const json = await res.json();
     if (!res.ok) {
@@ -326,7 +329,10 @@ export const api = {
     if (!res.ok) {
       throw new Error(json.message || "Failed to start chat with seller");
     }
-    return { conversation: json.conversation, product: json.product };
+    return {
+      conversation: json.conversation,
+      product: json.product,
+    };
   },
 
   async payForRequirement(
@@ -342,6 +348,9 @@ export const api = {
     if (!res.ok) {
       throw new Error(json.message || "Payment failed");
     }
-    return { order: json.order, conversationId: json.conversationId };
+    return {
+      order: json.order,
+      conversationId: json.conversationId,
+    };
   },
 };

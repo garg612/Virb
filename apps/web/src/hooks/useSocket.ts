@@ -149,6 +149,10 @@ export function useSocket({
     });
 
     socket.on("conversationUpdated", (conv: Conversation) => {
+      if (conv?.id) {
+        socket.emit("joinConversation", conv.id);
+        joinedRoomsRef.current.add(conv.id);
+      }
       onConversationUpdatedRef.current?.(conv);
     });
 

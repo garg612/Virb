@@ -8,6 +8,8 @@ interface NavbarProps {
   isConnected: boolean;
   onOpenNewChat: () => void;
   onOpenNewGroup: () => void;
+  onOpenMarketSearch: () => void;
+  onOpenRequirements: () => void;
   onLogout: () => void;
   onOpenAuth: () => void;
 }
@@ -17,6 +19,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   isConnected,
   onOpenNewChat,
   onOpenNewGroup,
+  onOpenMarketSearch,
+  onOpenRequirements,
   onLogout,
   onOpenAuth,
 }) => {
@@ -95,6 +99,28 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
         {currentUser ? (
           <>
+            <button
+              id="btn-navbar-market-search"
+              className="btn-secondary"
+              onClick={onOpenMarketSearch}
+              style={{ fontSize: "0.85rem", padding: "8px 14px", borderColor: "rgba(99, 102, 241, 0.4)" }}
+              title="Search products like cars, phones, laptops"
+            >
+              <span>🔍</span>
+              Search Market
+            </button>
+
+            <button
+              id="btn-navbar-requirements"
+              className="btn-secondary"
+              onClick={onOpenRequirements}
+              style={{ fontSize: "0.85rem", padding: "8px 14px" }}
+              title="Sell item (hidden until searched)"
+            >
+              <span>🏷️</span>
+              Sell / Requirements
+            </button>
+
             <button
               id="btn-navbar-new-chat"
               className="btn-secondary"
