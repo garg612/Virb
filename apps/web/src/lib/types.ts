@@ -4,6 +4,7 @@ export interface User {
   email: string;
   username: string;
   avatar?: string | null;
+  publicKey?: string | null;
   createdAt?: string;
 }
 
@@ -12,6 +13,7 @@ export interface MessageSender {
   name: string;
   username?: string;
   avatar?: string | null;
+  publicKey?: string | null;
 }
 
 export interface ReplyToMessage {

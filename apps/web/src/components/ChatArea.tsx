@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { Conversation, Message, User } from "../lib/types";
+import { decryptDirectMessage, isEncryptedMessage } from "../lib/crypto";
 
 interface ChatAreaProps {
   conversation: Conversation | null;
@@ -41,12 +42,47 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [inputText, setInputText] = useState("");
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [decryptedMap, setDecryptedMap] = useState<Record<number, string>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Decrypt incoming or loaded messages for 1-on-1 direct conversations
+  useEffect(() => {
+    if (!conversation || conversation.isGroup || !currentUser) return;
+    const otherParticipant = conversation.participants?.find((p) => p.id !== currentUser.id);
+    if (!otherParticipant?.publicKey) return;
+
+    let isMounted = true;
+    const toDecrypt = messages.filter(
+      (m) => m.content && isEncryptedMessage(m.content) && !decryptedMap[m.id]
+    );
+
+    if (toDecrypt.length === 0) return;
+
+    Promise.all(
+      toDecrypt.map(async (m) => {
+        const decrypted = await decryptDirectMessage(m.content, currentUser.id, otherParticipant.publicKey);
+        return { id: m.id, text: decrypted };
+      })
+    ).then((results) => {
+      if (!isMounted) return;
+      setDecryptedMap((prev) => {
+        const next = { ...prev };
+        results.forEach((r) => {
+          next[r.id] = r.text;
+        });
+        return next;
+      });
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [messages, conversation, currentUser, decryptedMap]);
 
   if (!conversation) {
     return (
@@ -201,10 +237,27 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 </span>
               ) : conversation.isGroup ? (
                 `${conversation.participants?.length || 0} participants`
-              ) : isOtherOnline ? (
-                "Online"
               ) : (
-                otherParticipant ? `@${otherParticipant.username}` : "Offline"
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "8px" }}>
+                  <span>{isOtherOnline ? "Online" : otherParticipant ? `@${otherParticipant.username}` : "Offline"}</span>
+                  <span
+                    style={{
+                      fontSize: "0.68rem",
+                      fontWeight: 600,
+                      color: "var(--accent-emerald)",
+                      background: "rgba(16, 185, 129, 0.12)",
+                      border: "1px solid rgba(16, 185, 129, 0.25)",
+                      padding: "1px 7px",
+                      borderRadius: "10px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "3px",
+                    }}
+                    title="End-to-End Encrypted via ECDH & AES-256-GCM. Messages are encrypted locally on device."
+                  >
+                    🔒 E2EE
+                  </span>
+                </span>
               )}
             </div>
           </div>
@@ -335,7 +388,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     <strong style={{ color: "var(--text-main)", marginRight: "4px" }}>
                       {msg.replyTo.sender?.name || "Replying"}:
                     </strong>
-                    {msg.replyTo.content || "[Media]"}
+                    {decryptedMap[msg.replyTo.id] || msg.replyTo.content || "[Media]"}
                   </div>
                 )}
 
@@ -360,7 +413,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     </em>
                   ) : (
                     <>
-                      <div>{msg.content}</div>
+                      <div>{decryptedMap[msg.id] || msg.content}</div>
                       {msg.isEdited && (
                         <span style={{ fontSize: "0.7rem", opacity: 0.7, marginLeft: "6px" }}>(edited)</span>
                       )}
@@ -379,6 +432,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       opacity: 0.75,
                     }}
                   >
+                    {isEncryptedMessage(msg.content) && (
+                      <span title="End-to-End Encrypted Message" style={{ fontSize: "0.68rem" }}>
+                        🔒
+                      </span>
+                    )}
                     <span>
                       {new Date(msg.createdAt).toLocaleTimeString([], {
                         hour: "2-digit",
@@ -424,7 +482,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         <button
                           onClick={() => {
                             setEditingMessage(msg);
-                            setInputText(msg.content || "");
+                            setInputText(decryptedMap[msg.id] || msg.content || "");
                           }}
                           style={{
                             background: "none",

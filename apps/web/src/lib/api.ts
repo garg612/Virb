@@ -53,6 +53,18 @@ export const api = {
     };
   },
 
+  async updatePublicKey(publicKey: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/users/public-key`, {
+      method: "PUT",
+      headers: getHeaders(),
+      body: JSON.stringify({ publicKey }),
+    });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.message || "Failed to update public key");
+    }
+  },
+
   async logout(): Promise<void> {
     try {
       await fetch(`${API_BASE}/api/users/logout`, {

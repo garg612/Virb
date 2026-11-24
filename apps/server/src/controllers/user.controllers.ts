@@ -242,6 +242,7 @@ const getallUsers = asyncHandler(async (req, res) => {
       username: true,
       email: true,
       avatar: true,
+      publicKey: true,
     },
     orderBy: {
       createdAt: "desc",
@@ -265,10 +266,38 @@ const getallUsers = asyncHandler(async (req, res) => {
   });
 });
 
+const updatePublicKey = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const { publicKey } = req.body;
+
+  if (!publicKey || typeof publicKey !== "string") {
+    return res.status(400).json({
+      message: "Valid public key string is required",
+    });
+  }
+
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { publicKey: publicKey.trim() },
+    select: {
+      id: true,
+      name: true,
+      username: true,
+      publicKey: true,
+    },
+  });
+
+  return res.status(200).json({
+    message: "End-to-End Encryption public key saved successfully",
+    user,
+  });
+});
+
 export {
   registerUser,
   refreshAccessToken,
   logoutUser,
   changeAvatar,
   getallUsers,
+  updatePublicKey,
 };

@@ -29,6 +29,7 @@ model User {
   products     Product[] @relation("UserProducts")
   boughtOrders Order[]   @relation("BuyerOrders")
   soldOrders   Order[]   @relation("SellerOrders")
+  publicKey    String?
   createdAt   DateTime @default(now())
 }
 

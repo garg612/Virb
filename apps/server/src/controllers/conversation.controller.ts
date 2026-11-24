@@ -61,6 +61,7 @@ const createconversation = asyncHandler(async (req, res) => {
           name: true,
           username: true,
           avatar: true,
+          publicKey: true,
         },
       },
       messages: {
@@ -118,6 +119,7 @@ const createGroup = asyncHandler(async (req, res) => {
           name: true,
           username: true,
           avatar: true,
+          publicKey: true,
         },
       },
       messages: {
@@ -175,6 +177,7 @@ const sendMessage = asyncHandler(async (req, res) => {
           name: true,
           username: true,
           avatar: true,
+          publicKey: true,
         },
       },
     },
@@ -218,6 +221,7 @@ const sendMessage = asyncHandler(async (req, res) => {
           name: true,
           username: true,
           avatar: true,
+          publicKey: true,
         },
       },
       replyTo: {
@@ -271,6 +275,7 @@ const getmessages = asyncHandler(async (req, res) => {
           name: true,
           username: true,
           avatar: true,
+          publicKey: true,
         },
       },
     },
@@ -302,6 +307,7 @@ const getUserConversations = asyncHandler(async (req, res) => {
           name: true,
           username: true,
           avatar: true,
+          publicKey: true,
         },
       },
       messages: {
@@ -623,6 +629,7 @@ const acceptConversationRequest = asyncHandler(async (req, res) => {
           name: true,
           username: true,
           avatar: true,
+          publicKey: true,
         },
       },
     },
@@ -656,6 +663,7 @@ const acceptConversationRequest = asyncHandler(async (req, res) => {
           name: true,
           username: true,
           avatar: true,
+          publicKey: true,
         },
       },
       messages: {
@@ -719,6 +727,7 @@ const rejectConversationRequest = asyncHandler(async (req, res) => {
             name: true,
             username: true,
             avatar: true,
+          publicKey: true,
           },
         },
       },

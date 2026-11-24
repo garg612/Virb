@@ -15,6 +15,7 @@ import { GroupModal } from "../components/GroupModal";
 import { RequirementModal } from "../components/RequirementModal";
 import { MarketSearchModal } from "../components/MarketSearchModal";
 import { PaymentModal } from "../components/PaymentModal";
+import { ensureUserE2EE, encryptDirectMessage } from "../lib/crypto";
 
 export default function HomePage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -62,6 +63,19 @@ export default function HomePage() {
       }
     }
   }, []);
+
+  // Ensure End-to-End Encryption key pair exists locally and public key is synced to server
+  useEffect(() => {
+    if (currentUser?.id) {
+      ensureUserE2EE(currentUser.id, currentUser.publicKey).then((pub) => {
+        if (pub && (!currentUser.publicKey || currentUser.publicKey !== pub)) {
+          setCurrentUser((prev) => (prev ? { ...prev, publicKey: pub } : null));
+          const updated = { ...currentUser, publicKey: pub };
+          localStorage.setItem("chat_user", JSON.stringify(updated));
+        }
+      });
+    }
+  }, [currentUser?.id]);
 
   // Helper to safely append unique message
   const appendMessageDeduplicated = (prev: Message[], msg: Message): Message[] => {
@@ -242,13 +256,22 @@ export default function HomePage() {
     markSeen(conv.id);
   };
 
-  // Action: Send message (guarantees NO duplicate addition)
+  // Action: Send message (guarantees NO duplicate addition + E2EE encryption)
   const handleSendMessage = async (content: string, replyToId?: number | null) => {
-    if (!activeConversation) return;
+    if (!activeConversation || !currentUser) return;
     try {
+      let finalContent = content;
+      // In 1-on-1 direct conversations, encrypt content with recipient's public key
+      if (!activeConversation.isGroup) {
+        const otherParticipant = activeConversation.participants?.find((p) => p.id !== currentUser.id);
+        if (otherParticipant?.publicKey) {
+          finalContent = await encryptDirectMessage(content, currentUser.id, otherParticipant.publicKey);
+        }
+      }
+
       const sent = await api.sendMessage({
         conversationId: activeConversation.id,
-        content,
+        content: finalContent,
         replyToId,
       });
 
@@ -272,10 +295,18 @@ export default function HomePage() {
     }
   };
 
-  // Action: Edit message
+  // Action: Edit message (with E2EE if direct conversation)
   const handleEditMessage = async (messageId: number, content: string) => {
     try {
-      const updated = await api.editMessage(messageId, content);
+      let finalContent = content;
+      if (activeConversation && !activeConversation.isGroup && currentUser) {
+        const otherParticipant = activeConversation.participants?.find((p) => p.id !== currentUser.id);
+        if (otherParticipant?.publicKey) {
+          finalContent = await encryptDirectMessage(content, currentUser.id, otherParticipant.publicKey);
+        }
+      }
+
+      const updated = await api.editMessage(messageId, finalContent);
       setMessages((prev) =>
         prev.map((m) => (Number(m.id) === Number(messageId) ? updated : m))
       );
